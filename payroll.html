@@ -32,7 +32,7 @@
       margin-bottom: 10px;
     }
 
-    input[type="number"], input[type="text"] {
+    input[type="number"], input[type="text"], input[type="date"] {
       width: 150px;
       padding: 5px;
     }
@@ -46,7 +46,6 @@
     }
 
     button {
-      background-color: #90EE90;
       padding: 10px 20px;
       border: none;
       cursor: pointer;
@@ -56,24 +55,11 @@
       transition: background-color 0.3s;
     }
 
-    #compute {
-      background-color: #4ade80;
-    }
-
-    #clear {
-      background-color: #f87171;
-    }
-
-    #exportCsv {
-      background-color: #60a5fa;
-    }
-
-    #downloadPdf, #print {
-      background-color: #fbbf24;
-    }
-    #view{
-      background-color: orange;
-    }
+    #compute { background-color: #4ade80; }
+    #clear { background-color: #f87171; }
+    #exportCsv { background-color: #60a5fa; }
+    #downloadPdf, #print { background-color: #fbbf24; }
+    #view { background-color: orange; }
 
     .center-button {
       display: flex;
@@ -90,7 +76,7 @@
     }
 
     button:hover {
-      background-color: #70d870;
+      filter: brightness(1.1);
     }
   </style>
 </head>
@@ -100,10 +86,9 @@
     <h2><b>Payroll System</b></h2>
 
     <div class="row">
-    <label for="employeeName">Payday:</label>
-    <input type="date" id="Payday" />
+      <label for="Payday">Payday:</label>
+      <input type="date" id="Payday" />
     </div>
-
 
     <div class="row">
       <label for="employeeName">Employee Name:</label>
@@ -117,17 +102,17 @@
 
     <div class="row">
       <label for="ratePerHour">Rate / Hour:</label>
-      <input type="number" id="ratePerHour" />
+      <input type="number" id="ratePerHour" min="0" step="0.01" />
     </div>
 
     <div class="row">
       <label for="hoursPerDay">Hours / Day:</label>
-      <input type="number" id="hoursPerDay" />
+      <input type="number" id="hoursPerDay" min="0" step="0.01" />
     </div>
 
     <div class="row">
       <label for="daysWorked">Number of Days Worked:</label>
-      <input type="number" id="daysWorked" />
+      <input type="number" id="daysWorked" min="0" step="1" />
     </div>
 
     <div class="row">
@@ -138,7 +123,7 @@
     <h2><b>Deduction Of Salary</b></h2>
 
     <div class="row">
-      <label for="tax">Tax :</label>
+      <label for="tax">Tax:</label>
       <input type="number" id="tax" readonly />
     </div>
 
@@ -148,7 +133,7 @@
     </div>
 
     <div class="row">
-      <label for="sss">SSS :</label>
+      <label for="sss">SSS:</label>
       <input type="number" id="sss" readonly />
     </div>
 
@@ -173,24 +158,34 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
+    const computedFields = ["grossSalary", "tax", "philHealth", "sss", "totalDeduction", "netSalary"];
+
+    // Clear computed fields when inputs change
+    ["ratePerHour", "hoursPerDay", "daysWorked"].forEach(id => {
+      document.getElementById(id).addEventListener("input", () => {
+        computedFields.forEach(f => (document.getElementById(f).value = ""));
+      });
+    });
+
     document.getElementById("compute").addEventListener("click", async () => {
-        
       const payday = document.getElementById("Payday").value;
-      if (!payday) {
-        alert("Please select a payday.");
-        return;
-      }
       const name = document.getElementById("employeeName").value.trim();
       const department = document.getElementById("Department").value.trim();
       const rate = parseFloat(document.getElementById("ratePerHour").value);
       const hours = parseFloat(document.getElementById("hoursPerDay").value);
       const days = parseFloat(document.getElementById("daysWorked").value);
 
-      if (!name || !department || isNaN(rate) || isNaN(hours) || isNaN(days)) {
-        alert("Please fill out all fields correctly.");
+      // Validate inputs
+      if (!payday || !name || !department) {
+        alert("Please fill out all required fields.");
+        return;
+      }
+      if (isNaN(rate) || rate < 0 || isNaN(hours) || hours < 0 || isNaN(days) || days < 0) {
+        alert("Please enter valid non-negative numbers for rate, hours, and days.");
         return;
       }
 
+      // Calculate payroll values
       const gross = rate * hours * days;
       const tax = gross * 0.15;
       const philHealth = gross * 0.05;
@@ -198,8 +193,7 @@
       const totalDeduction = tax + philHealth + sss;
       const net = gross - totalDeduction;
 
-        // Update the input fields with calculated values   
-
+      // Set computed values in form
       document.getElementById("grossSalary").value = gross.toFixed(2);
       document.getElementById("tax").value = tax.toFixed(2);
       document.getElementById("philHealth").value = philHealth.toFixed(2);
@@ -207,12 +201,13 @@
       document.getElementById("totalDeduction").value = totalDeduction.toFixed(2);
       document.getElementById("netSalary").value = net.toFixed(2);
 
+      // Send data to backend API
       try {
         const res = await fetch("http://localhost:3000/api/payrolls", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            Payday: date,
+            payday: payday,
             employeeName: name,
             Department: department,
             RateperHour: rate,
@@ -227,12 +222,14 @@
           }),
         });
 
-        const result = await res.json();
-        if (res.ok) {
-          alert("Payroll saved to database!");
-        } else {
-          alert("Failed to save payroll.");
+        if (!res.ok) {
+          const errorText = await res.text();
+          alert("Failed to save payroll: " + errorText);
+          return;
         }
+
+        const result = await res.json();
+        alert("Payroll saved to database!");
       } catch (error) {
         alert("Error connecting to server.");
         console.error(error);
@@ -241,6 +238,7 @@
 
     document.getElementById("exportCsv").addEventListener("click", () => {
       const fields = [
+        { label: "Payday", id: "Payday" },
         { label: "Employee Name", id: "employeeName" },
         { label: "Department", id: "Department" },
         { label: "Rate / Hour", id: "ratePerHour" },
@@ -254,9 +252,22 @@
         { label: "Net Salary", id: "netSalary" }
       ];
 
-      const csvHeaders = fields.map(f => f.label).join(",");
-      const csvValues = fields.map(f => `"${document.getElementById(f.id).value.trim()}"`).join(",");
+      // Build CSV header row
+      const csvHeaders = fields.map(f => `"${f.label}"`).join(",");
+
+      // Build CSV values row, convert undefined/null to empty string, no trim on date or numbers
+      const csvValues = fields.map(f => {
+        const el = document.getElementById(f.id);
+        if (!el) return "";
+        // For date or text input, get value as string
+        let val = el.value;
+        // Escape quotes in values by doubling them per CSV standard
+        val = val.replace(/"/g, '""');
+        return `"${val}"`;
+      }).join(",");
+
       const csvContent = csvHeaders + "\n" + csvValues;
+
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -264,42 +275,59 @@
       link.download = "payroll_data.csv";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
     });
 
     document.getElementById("downloadPdf").addEventListener("click", () => {
-      const { jsPDF } = window.jspdf;
+      const {
+        jsPDF
+      } = window.jspdf;
+
       const doc = new jsPDF();
 
-      doc.text("Payroll Summary", 10, 10);
-      let y = 20;
+      doc.setFontSize(18);
+      doc.text("Payroll System", 105, 15, null, null, "center");
 
       const fields = [
-        ["Employee Name", "employeeName"],
-        ["Department", "Department"],
-        ["Rate / Hour", "ratePerHour"],
-        ["Hours / Day", "hoursPerDay"],
-        ["Number of Days Worked", "daysWorked"],
-        ["Gross Salary", "grossSalary"],
-        ["Tax", "tax"],
-        ["PhilHealth", "philHealth"],
-        ["SSS", "sss"],
-        ["Total Deduction", "totalDeduction"],
-        ["Net Salary", "netSalary"]
+        ["Payday", document.getElementById("Payday").value],
+        ["Employee Name", document.getElementById("employeeName").value],
+        ["Department", document.getElementById("Department").value],
+        ["Rate / Hour", document.getElementById("ratePerHour").value],
+        ["Hours / Day", document.getElementById("hoursPerDay").value],
+        ["Number of Days Worked", document.getElementById("daysWorked").value],
+        ["Gross Salary", document.getElementById("grossSalary").value],
+        ["Tax", document.getElementById("tax").value],
+        ["PhilHealth", document.getElementById("philHealth").value],
+        ["SSS", document.getElementById("sss").value],
+        ["Total Deduction", document.getElementById("totalDeduction").value],
+        ["Net Salary", document.getElementById("netSalary").value]
       ];
 
-      fields.forEach(([label, id]) => {
-        const value = document.getElementById(id).value;
-        doc.text(`${label}: ${value}`, 10, y);
+      doc.setFontSize(12);
+
+      let y = 30;
+      fields.forEach(([label, val]) => {
+        doc.text(`${label}: ${val}`, 15, y);
         y += 10;
       });
 
-      doc.save("payroll_summary.pdf");
+      doc.save("payroll_data.pdf");
     });
 
     document.getElementById("clear").addEventListener("click", () => {
-      const inputs = document.querySelectorAll("input");
-      inputs.forEach(input => input.value = "");
+      // Clear inputs and computed fields
+      const allIds = [
+        "Payday", "employeeName", "Department",
+        "ratePerHour", "hoursPerDay", "daysWorked",
+        ...computedFields
+      ];
+      allIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
     });
 
     document.getElementById("print").addEventListener("click", () => {
