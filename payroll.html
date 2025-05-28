@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Payroll System</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       background-color: blue;
       padding: 20px;
+      color: #222;
     }
-
     .container {
       max-width: 700px;
       margin: auto;
@@ -19,24 +19,22 @@
       border-radius: 8px;
       box-shadow: 0 0 10px #444;
     }
-
     h2 {
       text-align: center;
       font-weight: bold;
       margin: 20px 0;
     }
-
     label {
       display: inline-block;
       width: 180px;
       margin-bottom: 10px;
     }
-
     input[type="number"], input[type="text"], input[type="date"] {
       width: 150px;
       padding: 5px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
     }
-
     .row {
       display: flex;
       justify-content: space-between;
@@ -44,7 +42,6 @@
       margin-bottom: 10px;
       align-items: center;
     }
-
     button {
       padding: 10px 20px;
       border: none;
@@ -53,28 +50,24 @@
       margin: 10px 5px 0 5px;
       border-radius: 5px;
       transition: background-color 0.3s;
+      color: white;
     }
-
     #compute { background-color: #4ade80; }
     #clear { background-color: #f87171; }
     #exportCsv { background-color: #60a5fa; }
-    #downloadPdf, #print { background-color: #fbbf24; }
-    #view { background-color: orange; }
-
+    #downloadPdf, #print { background-color: #fbbf24; color: #222; }
     .center-button {
       display: flex;
       justify-content: center;
       gap: 15px;
       flex-wrap: wrap;
     }
-
     .centered-logo {
       display: block;
       margin: 0 auto 20px auto;
       max-width: 100px;
       height: auto;
     }
-
     button:hover {
       filter: brightness(1.1);
     }
@@ -86,8 +79,8 @@
     <h2><b>Payroll System</b></h2>
 
     <div class="row">
-      <label for="Payday">Payday:</label>
-      <input type="date" id="Payday" />
+      <label for="payday">Payday:</label>
+      <input type="date" id="payday" />
     </div>
 
     <div class="row">
@@ -96,8 +89,8 @@
     </div>
 
     <div class="row">
-      <label for="Department">Department:</label>
-      <input type="text" id="Department" />
+      <label for="department">Department:</label>
+      <input type="text" id="department" />
     </div>
 
     <div class="row">
@@ -156,183 +149,179 @@
     </div>
   </div>
 
+  <!-- jsPDF library for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
-    const computedFields = ["grossSalary", "tax", "philHealth", "sss", "totalDeduction", "netSalary"];
+    (function() {
+      const computedFields = ["grossSalary", "tax", "philHealth", "sss", "totalDeduction", "netSalary"];
 
-    // Clear computed fields when inputs change
-    ["ratePerHour", "hoursPerDay", "daysWorked"].forEach(id => {
-      document.getElementById(id).addEventListener("input", () => {
-        computedFields.forEach(f => (document.getElementById(f).value = ""));
-      });
-    });
-
-    document.getElementById("compute").addEventListener("click", async () => {
-      const payday = document.getElementById("Payday").value;
-      const name = document.getElementById("employeeName").value.trim();
-      const department = document.getElementById("Department").value.trim();
-      const rate = parseFloat(document.getElementById("ratePerHour").value);
-      const hours = parseFloat(document.getElementById("hoursPerDay").value);
-      const days = parseFloat(document.getElementById("daysWorked").value);
-
-      // Validate inputs
-      if (!payday || !name || !department) {
-        alert("Please fill out all required fields.");
-        return;
-      }
-      if (isNaN(rate) || rate < 0 || isNaN(hours) || hours < 0 || isNaN(days) || days < 0) {
-        alert("Please enter valid non-negative numbers for rate, hours, and days.");
-        return;
-      }
-
-      // Calculate payroll values
-      const gross = rate * hours * days;
-      const tax = gross * 0.15;
-      const philHealth = gross * 0.05;
-      const sss = gross * 0.11;
-      const totalDeduction = tax + philHealth + sss;
-      const net = gross - totalDeduction;
-
-      // Set computed values in form
-      document.getElementById("grossSalary").value = gross.toFixed(2);
-      document.getElementById("tax").value = tax.toFixed(2);
-      document.getElementById("philHealth").value = philHealth.toFixed(2);
-      document.getElementById("sss").value = sss.toFixed(2);
-      document.getElementById("totalDeduction").value = totalDeduction.toFixed(2);
-      document.getElementById("netSalary").value = net.toFixed(2);
-
-      // Send data to backend API
-      try {
-        const res = await fetch("http://localhost:3000/api/payrolls", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            payday: payday,
-            employeeName: name,
-            Department: department,
-            RateperHour: rate,
-            HoursperDay: hours,
-            NumbersofDaysWorked: days,
-            GrossSalary: gross,
-            Tax: tax,
-            Philhealth: philHealth,
-            SSS: sss,
-            TotalDeductions: totalDeduction,
-            NetSalary: net
-          }),
+      // Clear computed fields when relevant inputs change
+      ["ratePerHour", "hoursPerDay", "daysWorked"].forEach(id => {
+        document.getElementById(id).addEventListener("input", () => {
+          computedFields.forEach(f => (document.getElementById(f).value = ""));
         });
+      });
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          alert("Failed to save payroll: " + errorText);
+      // COMPUTE button event
+      document.getElementById("compute").addEventListener("click", async () => {
+        const payday = document.getElementById("payday").value;
+        const employeeName = document.getElementById("employeeName").value.trim();
+        const department = document.getElementById("department").value.trim();
+        const ratePerHour = parseFloat(document.getElementById("ratePerHour").value);
+        const hoursPerDay = parseFloat(document.getElementById("hoursPerDay").value);
+        const daysWorked = parseInt(document.getElementById("daysWorked").value);
+
+        // Validate inputs
+        if (!payday || !employeeName || !department) {
+          alert("Please fill out all required fields (payday, employee name, department).");
+          return;
+        }
+        if (
+          isNaN(ratePerHour) || ratePerHour < 0 ||
+          isNaN(hoursPerDay) || hoursPerDay < 0 ||
+          isNaN(daysWorked) || daysWorked < 0
+        ) {
+          alert("Please enter valid non-negative numbers for rate, hours, and days.");
           return;
         }
 
-        const result = await res.json();
-        alert("Payroll saved to database!");
-      } catch (error) {
-        alert("Error connecting to server.");
-        console.error(error);
+        // Calculate payroll values
+        const grossSalary = ratePerHour * hoursPerDay * daysWorked;
+        const tax = grossSalary * 0.15;
+        const philHealth = grossSalary * 0.05;
+        const sss = grossSalary * 0.11;
+        const totalDeduction = tax + philHealth + sss;
+        const netSalary = grossSalary - totalDeduction;
+
+        // Set computed values in form
+        document.getElementById("grossSalary").value = grossSalary.toFixed(2);
+        document.getElementById("tax").value = tax.toFixed(2);
+        document.getElementById("philHealth").value = philHealth.toFixed(2);
+        document.getElementById("sss").value = sss.toFixed(2);
+        document.getElementById("totalDeduction").value = totalDeduction.toFixed(2);
+        document.getElementById("netSalary").value = netSalary.toFixed(2);
+
+        // Prepare data to send
+      // Send data to backend API
+const payrollData = {
+  payday,
+  employeeName,
+  department,
+  RateperHour: ratePerHour.toFixed(2),
+  HoursperDay: hoursPerDay.toFixed(2),
+  NumbersofDaysWorked: daysWorked,
+  GrossSalary: grossSalary.toFixed(2),
+  Tax: tax.toFixed(2),
+  Philhealth: philHealth.toFixed(2),
+  SSS: sss.toFixed(2),
+  TotalDeductions: totalDeduction.toFixed(2),
+  NetSalary: netSalary.toFixed(2),
+};
+
+try {
+  const res = await fetch("http://localhost:3000/api/payrolls", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payrollData),
+  });
+
+  if (!res.ok) {
+    let errorText = "Failed to save payroll.";
+    try {
+      const errorJson = await res.json();
+      if (errorJson && errorJson.error) {
+        errorText = errorJson.error;
       }
-    });
+    } catch {}
+    alert(errorText);
+    return;
+  }
 
-    document.getElementById("exportCsv").addEventListener("click", () => {
-      const fields = [
-        { label: "Payday", id: "Payday" },
-        { label: "Employee Name", id: "employeeName" },
-        { label: "Department", id: "Department" },
-        { label: "Rate / Hour", id: "ratePerHour" },
-        { label: "Hours / Day", id: "hoursPerDay" },
-        { label: "Number of Days Worked", id: "daysWorked" },
-        { label: "Gross Salary", id: "grossSalary" },
-        { label: "Tax", id: "tax" },
-        { label: "PhilHealth", id: "philHealth" },
-        { label: "SSS", id: "sss" },
-        { label: "Total Deduction", id: "totalDeduction" },
-        { label: "Net Salary", id: "netSalary" }
-      ];
+  alert("Payroll saved to database!");
+} catch (error) {
+  alert("Error connecting to server.");
+  console.error(error);
+}
+      });
 
-      // Build CSV header row
-      const csvHeaders = fields.map(f => `"${f.label}"`).join(",");
+      // CLEAR button event
+      document.getElementById("clear").addEventListener("click", () => {
+        ["payday", "employeeName", "department", "ratePerHour", "hoursPerDay", "daysWorked", ...computedFields]
+          .forEach(id => document.getElementById(id).value = "");
+      });
 
-      // Build CSV values row, convert undefined/null to empty string, no trim on date or numbers
-      const csvValues = fields.map(f => {
-        const el = document.getElementById(f.id);
-        if (!el) return "";
-        // For date or text input, get value as string
-        let val = el.value;
-        // Escape quotes in values by doubling them per CSV standard
-        val = val.replace(/"/g, '""');
-        return `"${val}"`;
-      }).join(",");
+      // EXPORT CSV button event
+      document.getElementById("exportCsv").addEventListener("click", () => {
+        const fields = [
+          "payday", "employeeName", "department", "ratePerHour", "hoursPerDay", "daysWorked",
+          "grossSalary", "tax", "philHealth", "sss", "totalDeduction", "netSalary"
+        ];
 
-      const csvContent = csvHeaders + "\n" + csvValues;
+        // Check if required fields have data before exporting CSV
+        if (!document.getElementById("employeeName").value.trim()) {
+          alert("Please enter Employee Name before exporting CSV.");
+          return;
+        }
 
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "payroll_data.csv";
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(() => {
-        document.body.removeChild(link);
+        let csvContent = fields.join(",") + "\n";
+        let values = fields.map(id => {
+          const val = document.getElementById(id).value || "";
+          // Escape quotes by doubling them (CSV standard)
+          return `"${val.replace(/"/g, '""')}"`;
+        });
+        csvContent += values.join(",");
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `payroll_${document.getElementById("employeeName").value || "record"}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
-      }, 100);
-    });
-
-    document.getElementById("downloadPdf").addEventListener("click", () => {
-      const {
-        jsPDF
-      } = window.jspdf;
-
-      const doc = new jsPDF();
-
-      doc.setFontSize(18);
-      doc.text("Payroll System", 105, 15, null, null, "center");
-
-      const fields = [
-        ["Payday", document.getElementById("Payday").value],
-        ["Employee Name", document.getElementById("employeeName").value],
-        ["Department", document.getElementById("Department").value],
-        ["Rate / Hour", document.getElementById("ratePerHour").value],
-        ["Hours / Day", document.getElementById("hoursPerDay").value],
-        ["Number of Days Worked", document.getElementById("daysWorked").value],
-        ["Gross Salary", document.getElementById("grossSalary").value],
-        ["Tax", document.getElementById("tax").value],
-        ["PhilHealth", document.getElementById("philHealth").value],
-        ["SSS", document.getElementById("sss").value],
-        ["Total Deduction", document.getElementById("totalDeduction").value],
-        ["Net Salary", document.getElementById("netSalary").value]
-      ];
-
-      doc.setFontSize(12);
-
-      let y = 30;
-      fields.forEach(([label, val]) => {
-        doc.text(`${label}: ${val}`, 15, y);
-        y += 10;
       });
 
-      doc.save("payroll_data.pdf");
-    });
+      // DOWNLOAD PDF button event
+      document.getElementById("downloadPdf").addEventListener("click", () => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
 
-    document.getElementById("clear").addEventListener("click", () => {
-      // Clear inputs and computed fields
-      const allIds = [
-        "Payday", "employeeName", "Department",
-        "ratePerHour", "hoursPerDay", "daysWorked",
-        ...computedFields
-      ];
-      allIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = "";
+        doc.setFontSize(16);
+        doc.text("Payroll System", 105, 15, null, null, "center");
+
+        const fields = [
+          ["Payday", "payday"],
+          ["Employee Name", "employeeName"],
+          ["Department", "department"],
+          ["Rate Per Hour", "ratePerHour"],
+          ["Hours Per Day", "hoursPerDay"],
+          ["Days Worked", "daysWorked"],
+          ["Gross Salary", "grossSalary"],
+          ["Tax", "tax"],
+          ["PhilHealth", "philHealth"],
+          ["SSS", "sss"],
+          ["Total Deduction", "totalDeduction"],
+          ["Net Salary", "netSalary"],
+        ];
+
+        let y = 30;
+        doc.setFontSize(12);
+        fields.forEach(([label, id]) => {
+          const val = document.getElementById(id).value || "";
+          doc.text(`${label}: ${val}`, 15, y);
+          y += 10;
+        });
+
+        doc.save(`payroll_${document.getElementById("employeeName").value || "record"}.pdf`);
       });
-    });
 
-    document.getElementById("print").addEventListener("click", () => {
-      window.print();
-    });
+      // PRINT button event
+      document.getElementById("print").addEventListener("click", () => {
+        window.print();
+      });
+    })();
   </script>
 </body>
 </html>
+
