@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve frontend static files (remove if not used)
+// Serve static files from 'frontend' folder
 app.use(express.static(path.join(__dirname, "frontend")));
 
 // MongoDB connection
@@ -24,19 +24,22 @@ mongoose
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 // Payroll Schema and Model
-const payrollSchema = new mongoose.Schema({
-  employeeName: { type: String, required: true },
-  RateperHour: { type: Number, required: true },
-  HoursperDay: { type: Number, required: true },
-  NumbersofDaysWorked: { type: Number, required: true },
-  GrossSalary: { type: Number, required: true },
-  Tax: { type: Number, required: true },
-  Philhealth: { type: Number, required: true },
-  SSS: { type: Number, required: true },
-  TotalDeductions: { type: Number, required: true },
-  NetSalary: { type: Number, required: true },
-  payday: { type: Date, required: true },
-});
+const payrollSchema = new mongoose.Schema(
+  {
+    employeeName: { type: String, required: true },
+    RateperHour: { type: Number, required: true, min: 0 },
+    HoursperDay: { type: Number, required: true, min: 0 },
+    NumbersofDaysWorked: { type: Number, required: true, min: 0 },
+    GrossSalary: { type: Number, required: true, min: 0 },
+    Tax: { type: Number, required: true, min: 0 },
+    Philhealth: { type: Number, required: true, min: 0 },
+    SSS: { type: Number, required: true, min: 0 },
+    TotalDeductions: { type: Number, required: true, min: 0 },
+    NetSalary: { type: Number, required: true, min: 0 },
+    payday: { type: Date, required: true },
+  },
+  { timestamps: true }
+);
 const Payroll = mongoose.model("Payroll", payrollSchema);
 
 // Employee Schema and Model
@@ -56,33 +59,32 @@ const Employee = mongoose.model("Employee", employeeSchema);
 // 13th Month Pay History Schema and Model
 const historySchema = new mongoose.Schema({
   employeeId: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", required: true },
-  pay: { type: Number, required: true },
+  pay: { type: Number, required: true, min: 0 },
   createdAt: { type: Date, default: Date.now },
 });
 const History = mongoose.model("History", historySchema);
 
-// Helper to validate time in HH:mm 24-hour format
+// Helper function to validate time in HH:mm 24-hour format
 function isValidTime(timeStr) {
   if (!timeStr) return true; // allow null/undefined
   const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
   return timeRegex.test(timeStr);
 }
 
-// --- Routes ---
 
-// Create payroll
 app.post("/api/payrolls", async (req, res) => {
   try {
     const payroll = new Payroll(req.body);
+    await payroll.validate();
     const saved = await payroll.save();
     res.status(201).json(saved);
   } catch (error) {
     console.error("Error saving payroll:", error);
-    res.status(500).json({ error: "Failed to save payroll data." });
+    res.status(400).json({ error: error.message || "Failed to save payroll data." });
   }
 });
 
-// Get all payrolls
+// Get all Payroll records
 app.get("/api/payrolls", async (req, res) => {
   try {
     const payrolls = await Payroll.find();
@@ -93,7 +95,7 @@ app.get("/api/payrolls", async (req, res) => {
   }
 });
 
-// Get all employees
+// Get all Employees
 app.get("/api/employees", async (req, res) => {
   try {
     const employees = await Employee.find();
@@ -104,22 +106,26 @@ app.get("/api/employees", async (req, res) => {
   }
 });
 
-// Add employee with validation for timeIn/timeOut
+// Add new Employee with validation for timeIn and timeOut
 app.post("/api/employees", async (req, res) => {
   try {
     const { name, position, department, monthlySalary, timeIn, timeOut } = req.body;
 
     if (!name || !position || !department || monthlySalary == null) {
       return res.status(400).json({
-        error: "Required fields: name, position, department, monthlySalary",
+        error: "All fields are required: name, position, department, monthlySalary.",
       });
     }
 
+    if (typeof monthlySalary !== "number" || isNaN(monthlySalary) || monthlySalary < 0) {
+      return res.status(400).json({ error: "monthlySalary must be a valid positive number." });
+    }
+
     if (!isValidTime(timeIn)) {
-      return res.status(400).json({ error: "timeIn must be HH:mm 24-hour format or empty" });
+      return res.status(400).json({ error: "timeIn must be in HH:mm 24-hour format or empty." });
     }
     if (!isValidTime(timeOut)) {
-      return res.status(400).json({ error: "timeOut must be HH:mm 24-hour format or empty" });
+      return res.status(400).json({ error: "timeOut must be in HH:mm 24-hour format or empty." });
     }
 
     const newEmployee = new Employee({
@@ -139,19 +145,29 @@ app.post("/api/employees", async (req, res) => {
   }
 });
 
-// Calculate 13th month pay and save to history
+// Calculate 13th month pay and save history
 app.post("/api/calculate", async (req, res) => {
   try {
     const { employeeId } = req.body;
-    if (!employeeId) return res.status(400).json({ error: "employeeId required" });
+    if (!employeeId) return res.status(400).json({ error: "EmployeeId is required" });
 
     const employee = await Employee.findById(employeeId);
     if (!employee) return res.status(404).json({ error: "Employee not found" });
 
-    // Simple 13th month pay calc: monthlySalary / 12
+    if (
+      typeof employee.monthlySalary !== "number" ||
+      isNaN(employee.monthlySalary) ||
+      employee.monthlySalary < 0
+    ) {
+      return res.status(400).json({ error: "Invalid monthlySalary for employee" });
+    }
+
     const pay = parseFloat((employee.monthlySalary / 12).toFixed(2));
 
-    const historyEntry = new History({ employeeId: employee._id, pay });
+    const historyEntry = new History({
+      employeeId: employee._id,
+      pay,
+    });
     await historyEntry.save();
 
     res.json({ pay });
@@ -161,7 +177,7 @@ app.post("/api/calculate", async (req, res) => {
   }
 });
 
-// Get 13th month pay history by employeeId
+// Get 13th month pay calculation history for an employee
 app.get("/api/history/:employeeId", async (req, res) => {
   try {
     const { employeeId } = req.params;
@@ -173,12 +189,12 @@ app.get("/api/history/:employeeId", async (req, res) => {
   }
 });
 
-// Fallback route for SPA (if you have frontend)
+// Serve index.html for all other routes (for SPA support)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
