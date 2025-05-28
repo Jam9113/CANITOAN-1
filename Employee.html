@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PIKIFI Employee Management System </title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #4A90E2;
+      padding: 20px;
+      color: white;
+    }
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: #3B5998;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px #222;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 25px;
+      font-weight: 700;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    input[type="text"], input[type="number"], input[type="time"] {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: none;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+    button {
+      background-color: #6AB04C;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      background-color: #4A852D;
+    }
+    .export-btn {
+      background-color: blue;
+      margin-top: 10px;
+    }
+    table {
+      margin-top: 30px;
+      width: 100%;
+      border-collapse: collapse;
+      background: #2E3B55;
+      color: white;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #4A90E2;
+      text-align: center;
+    }
+    th {
+      background-color: #1E2A43;
+    }
+    .action-btn {
+      margin: 0 5px;
+      padding: 5px 10px;
+      font-size: 14px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      color: white;
+    }
+    .edit-btn {
+      background-color: #FFA500;
+    }
+    .edit-btn:hover {
+      background-color: #cc8400;
+    }
+    .delete-btn {
+      background-color: #E74C3C;
+    }
+    .delete-btn:hover {
+      background-color: #b32d20;
+    }
+  </style>
+
+  <!-- jsPDF and jsPDF-AutoTable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <img src="PIKIFI LOGO.png" alt="Pikifi Logo" class="centered-logo" />
+    <h2>Employee Management System</h2>
+
+    <label for="name">Employee Name:</label>
+    <input type="text" id="name" />
+
+    <label for="position">Position:</label>
+    <input type="text" id="position" />
+
+    <label for="department">Department:</label>
+    <input type="text" id="department" />
+
+    <label for="monthlySalary">Monthly Salary (PHP):</label>
+    <input type="number" id="monthlySalary" min="0" />
+
+    <label for="timeIn">Time In:</label>
+    <input type="time" id="timeIn" />
+
+    <label for="timeOut">Time Out:</label>
+    <input type="time" id="timeOut" />
+
+    <button id="saveBtn">Save Employee Data</button>
+    <button id="exportPdfBtn" class="export-btn">Export to PDF</button>
+
+    <table id="employeeTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Position</th>
+          <th>Department</th>
+          <th>Monthly Salary (PHP)</th>
+          <th>Time In</th>
+          <th>Time Out</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+<script>
+  const API_URL = 'http://localhost:3000/api/employees';
+  const saveBtn = document.getElementById('saveBtn');
+  const exportPdfBtn = document.getElementById('exportPdfBtn');
+  const tbody = document.querySelector('#employeeTable tbody');
+  let editId = null;
+
+  async function fetchEmployees() {
+    const res = await fetch(API_URL);
+    return res.json();
+  }
+
+  async function addEmployee(employee) {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(employee)
+    });
+    return res.json();
+  }
+
+  async function updateEmployee(id, employee) {
+    await fetch(`${API_URL}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(employee)
+    });
+  }
+
+  async function deleteEmployee(id) {
+    await fetch(`${API_URL}/${id}`, {
+      method: 'DELETE'
+    });
+    updateTable();
+  }
+
+  function clearForm() {
+    document.getElementById('name').value = '';
+    document.getElementById('position').value = '';
+    document.getElementById('department').value = '';
+    document.getElementById('monthlySalary').value = '';
+    document.getElementById('timeIn').value = '';
+    document.getElementById('timeOut').value = '';
+    editId = null;
+    saveBtn.textContent = 'Save Employee Data';
+  }
+
+  async function editEmployee(id) {
+    const employees = await fetchEmployees();
+    const emp = employees.find(e => e._id === id);
+    if (!emp) return alert('Employee not found');
+
+    document.getElementById('name').value = emp.name;
+    document.getElementById('position').value = emp.position;
+    document.getElementById('department').value = emp.department;
+    document.getElementById('monthlySalary').value = emp.monthlySalary;
+    document.getElementById('timeIn').value = emp.timeIn;
+    document.getElementById('timeOut').value = emp.timeOut;
+    editId = id;
+    saveBtn.textContent = 'Update Employee Data';
+  }
+
+  async function updateTable() {
+    const employees = await fetchEmployees();
+    tbody.innerHTML = '';
+
+    if (employees.length > 0) {
+      employees.forEach(emp => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${emp.name}</td>
+          <td>${emp.position}</td>
+          <td>${emp.department}</td>
+          <td>${emp.monthlySalary}</td>
+          <td>${emp.timeIn}</td>
+          <td>${emp.timeOut}</td>
+          <td>
+            <button class="action-btn edit-btn" data-id="${emp._id}">Edit</button>
+            <button class="action-btn delete-btn" data-id="${emp._id}">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('employeeTable').style.display = 'table';
+
+      document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.onclick = () => editEmployee(btn.dataset.id);
+      });
+
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.onclick = () => {
+          if (confirm('Are you sure you want to delete this employee?')) {
+            deleteEmployee(btn.dataset.id);
+          }
+        };
+      });
+    } else {
+      document.getElementById('employeeTable').style.display = 'none';
+    }
+  }
+
+  saveBtn.onclick = async () => {
+    const name = document.getElementById('name').value.trim();
+    const position = document.getElementById('position').value.trim();
+    const department = document.getElementById('department').value.trim();
+    const monthlySalary = parseFloat(document.getElementById('monthlySalary').value.trim());
+    const timeIn = document.getElementById('timeIn').value;
+    const timeOut = document.getElementById('timeOut').value;
+
+    if (!name || !position || !department || !monthlySalary || !timeIn || !timeOut) {
+      return alert('Please fill in all fields.');
+    }
+
+    const employee = { name, position, department, monthlySalary, timeIn, timeOut };
+
+    try {
+      if (editId) {
+        await updateEmployee(editId, employee);
+        alert('Employee updated successfully!');
+      } else {
+        await addEmployee(employee);
+        alert('Employee added successfully!');
+      }
+      clearForm();
+      updateTable();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+exportPdfBtn.onclick = async () => {
+  const jsPDFModule = window.jspdf;
+  if (!jsPDFModule) {
+    alert('Failed to load jsPDF. Please check your script includes.');
+    return;
+  }
+
+  const doc = new jsPDFModule.jsPDF();
+  doc.setFontSize(18);
+  doc.text("Employee Report", 14, 20);
+
+  const employees = await fetchEmployees();
+  if (!employees.length) return alert('No employees to export.');
+
+  const rows = employees.map(emp => [
+    emp.name ?? '',
+    emp.position ?? '',
+    emp.department ?? '',
+    String(emp.monthlySalary ?? ''),
+    emp.timeIn ?? '',
+    emp.timeOut ?? ''
+  ]);
+
+  doc.autoTable({
+    startY: 30,
+    head: [['Name', 'Position', 'Department', 'Monthly Salary (PHP)', 'Time In', 'Time Out']],
+    body: rows,
+    styles: { fontSize: 10 }
+  });
+
+  doc.save('employee_report.pdf');
+};
+
+  updateTable();
+</script>
+</body>
+</html>

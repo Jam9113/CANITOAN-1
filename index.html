@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PIKIFI Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Poppins, sans-serif;
+    }
+
+    body {
+      display: flex;
+      height: 100vh;
+      background-color: #f4f4f4;
+      color: black;
+    }
+
+    .sidebar {
+      width: 250px;
+      background-color: #009ddc;
+      padding-top: 20px;
+      position: fixed;
+      height: 100%;
+      overflow-y: auto;
+    }
+    canvas#payrollChart {
+      max-width: 300px;
+      max-height: 300px;
+      margin: auto;
+      display: block;
+    }
+
+    .logo {
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+      padding: 15px;
+    }
+
+    .sidebar ul {
+      list-style: none;
+    }
+
+    .sidebar ul li {
+      padding: 15px;
+      transition: 0.3s;
+    }
+
+    .sidebar ul li a {
+      color: black;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+    }
+
+    .sidebar ul li a i {
+      margin-right: 10px;
+    }
+
+    .sidebar ul li:hover {
+      background: #00b3ff;
+      cursor: pointer;
+    }
+
+    .main-content {
+      margin-left: 250px;
+      padding: 20px;
+      width: calc(100% - 250px);
+      overflow-y: auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      padding: 15px;
+      box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    #clock {
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .dashboard-widgets {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .widget {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0px 3px 10px #009ddc;
+      text-align: center;
+      text-decoration: none;
+      color: black;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: 0.3s;
+    }
+
+    .widget:hover {
+      transform: scale(1.05);
+      box-shadow: 0px 5px 15px #009ddc;
+    }
+
+    .widget i {
+      font-size: 30px;
+    }
+
+    .widget p {
+      margin-top: 5px;
+      font-size: 18px;
+    }
+
+    .img {
+      width: 50%;
+      height: auto;
+      display: block;
+      margin: 0 auto 10px auto;
+    }
+
+    .chart-container {
+      margin-top: 30px;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Schedule section styles */
+    .schedule-section {
+      margin-top: 40px;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0px 3px 10px rgba(0,0,0,0.1);
+    }
+
+    .schedule-section h3 {
+      margin-bottom: 15px;
+      color: #009ddc;
+    }
+
+    .schedule-form {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .schedule-form label {
+      font-weight: 600;
+      margin-right: 5px;
+    }
+
+    .schedule-form select,
+    .schedule-form input[type="time"],
+    .schedule-form input[type="text"] {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .schedule-form button {
+      background-color: #009ddc;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .schedule-form button:hover {
+      background-color: #007bbd;
+    }
+
+    .schedule-list {
+      margin-top: 20px;
+    }
+
+    .schedule-list table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .schedule-list th,
+    .schedule-list td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+
+    .schedule-list th {
+      background-color: #009ddc;
+      color: white;
+    }
+
+    .delete-btn {
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .delete-btn:hover {
+      background-color: #c0392b;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 200px;
+      }
+      .main-content {
+        margin-left: 200px;
+        width: calc(100% - 200px);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .sidebar {
+        width: 100px;
+      }
+      .sidebar ul li a span {
+        display: none;
+      }
+      .main-content {
+        margin-left: 100px;
+        width: calc(100% - 100px);
+      }
+      .schedule-form {
+        flex-direction: column;
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <img src="PIKIFI LOGO.png" alt="Logo" class="img"/>
+    <div class="logo">PIKIFI Dashboard</div>
+    <ul class="main">
+      <li><a href="#"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></a></li>
+      <li><a href="payroll.html"><i class="fas fa-money-bill-wave"></i> <span>Payroll</span></a></li>
+      <li><a href="Employee.html"><i class="fas fa-user-tie"></i> <span>Employee</span></a></li>
+      <li><a href="monthpay.html"><i class="fas fa-calendar-alt"></i> <span>13th Month Pay</span></a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <div class="header">
+      <h1>Welcome to PIKIFI Dashboard</h1>
+      <span id="clock"></span>
+    </div>
+
+    <div class="dashboard-widgets">
+      <a href="Employee.html" class="widget">
+        <i class="fas fa-users"></i>
+        <p>Total Employees</p>
+      </a>
+      <a href="payroll.html" class="widget">
+        <i class="fas fa-dollar-sign"></i>
+        <p>Payroll</p>
+      </a>
+      <a href="13thmonthpay.html" class="widget">
+        <i class="fas fa-calendar-alt"></i>
+        <p>13th Month Pay</p>
+      </a>
+    </div>
+
+    <div class="chart-container">
+      <h3>Payroll Distribution</h3>
+      <canvas id="payrollChart"></canvas>
+    </div>
+
+    <!-- Schedule Section -->
+    <section class="schedule-section">
+      <h3>Create Your Schedule</h3>
+      <form class="schedule-form" id="scheduleForm">
+        <label for="day">Day:</label>
+        <select id="day" required>
+          <option value="" disabled selected>Select Day</option>
+          <option>Monday</option>
+          <option>Tuesday</option>
+          <option>Wednesday</option>
+          <option>Thursday</option>
+          <option>Friday</option>
+          <option>Saturday</option>
+          <option>Sunday</option>
+        </select>
+
+        <label for="startTime">Start Time:</label>
+        <input type="time" id="startTime" required />
+
+        <label for="endTime">End Time:</label>
+        <input type="time" id="endTime" required />
+
+        <label for="notes">Notes:</label>
+        <input type="text" id="notes" placeholder="Add notes" />
+
+        <button type="submit">Add Schedule</button>
+      </form>
+
+      <div class="schedule-list">
+        <table id="scheduleTable" border="1" cellpadding="10" cellspacing="0" style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+          <thead style="background-color: #009ddc; color: white;">
+            <tr>
+              <th>Day</th>
+              <th>Start Time</th>
+              <th>End Time</th>
+              <th>Notes</th>
+              <th>Action</th> 
+            </tr>
+          </thead>
+          <tbody id="scheduleRows">
+            <tr>
+              <td colspan="5" style="text-align: center; color: #999;">
+                No schedules added yet.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    function updateClock() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+      document.getElementById('clock').textContent = timeString;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Payroll Chart
+    const ctx = document.getElementById('payrollChart').getContext('2d');
+    const payrollChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: ['January', 'February', 'March', 'April', 'May', 'June'],
+        datasets: [{
+          label: 'Payroll',
+          data: [1200, 1900, 3000, 5000, 2300, 3200],
+          backgroundColor: [
+            '#FF6384', '#36A2EB', '#FFCE56', '#009ddc', '#4BC0C0', '#9966FF'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom',
+          }
+        }
+      }
+    });
+
+    // Schedule management logic
+    const scheduleForm = document.getElementById('scheduleForm');
+    const scheduleRows = document.getElementById('scheduleRows');
+
+    function clearNoSchedulesRow() {
+      if (scheduleRows.children.length === 1 && scheduleRows.children[0].textContent.includes('No schedules')) {
+        scheduleRows.innerHTML = '';
+      }
+    }
+
+    function addScheduleRow(day, start, end, notes) {
+      clearNoSchedulesRow();
+
+      const tr = document.createElement('tr');
+
+      const tdDay = document.createElement('td');
+      tdDay.textContent = day;
+      tr.appendChild(tdDay);
+
+      const tdStart = document.createElement('td');
+      tdStart.textContent = start;
+      tr.appendChild(tdStart);
+
+      const tdEnd = document.createElement('td');
+      tdEnd.textContent = end;
+      tr.appendChild(tdEnd);
+
+      const tdNotes = document.createElement('td');
+      tdNotes.textContent = notes;
+      tr.appendChild(tdNotes);
+
+      const tdAction = document.createElement('td');
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.addEventListener('click', () => {
+        tr.remove();
+        // If table empty, add the no schedules row
+        if (scheduleRows.children.length === 0) {
+          const noSchedules = document.createElement('tr');
+          noSchedules.innerHTML = `<td colspan="5" style="text-align:center; color:#999;">No schedules added yet.</td>`;
+          scheduleRows.appendChild(noSchedules);
+        }
+      });
+      tdAction.appendChild(deleteBtn);
+      tr.appendChild(tdAction);
+
+      scheduleRows.appendChild(tr);
+    }
+
+    scheduleForm.addEventListener('submit', e => {
+      e.preventDefault();
+
+      const day = scheduleForm.day.value;
+      const start = scheduleForm.startTime.value;
+      const end = scheduleForm.endTime.value;
+      const notes = scheduleForm.notes.value.trim();
+
+      if (!day || !start || !end) {
+        alert('Please fill in all required fields.');
+        return;
+      }
+
+      if (start >= end) {
+        alert('Start time must be earlier than end time.');
+        return;
+      }
+
+      addScheduleRow(day, start, end, notes);
+
+      scheduleForm.reset();
+      scheduleForm.day.focus();
+    });
+  </script>
+</body>
+</html>
